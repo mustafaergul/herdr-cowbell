@@ -1,0 +1,17 @@
+id = "mustafaergul.cowbell"
+name = "Cowbell"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Colored dots next to each workspace for its running servers"
+platforms = ["macos", "linux"]
+
+# Starts the background poller once per server start / handoff.
+[[startup]]
+command = ["sh", "start.sh"]
+
+# Manual (re)start, e.g. after `plugin link` without restarting the server.
+[[actions]]
+id = "restart"
+title = "Restart cowbell poller"
+contexts = ["workspace"]
+command = ["sh", "start.sh"]

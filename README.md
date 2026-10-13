@@ -1,0 +1,130 @@
+# Cowbell for Herdr
+
+See which of your [Herdr](https://github.com/herdrdev/herdr) workspaces have dev servers running, without switching to them.
+
+A herder knows where the herd is by its cowbells. Cowbell does the same for the servers in your Herdr workspaces.
+
+Each server running in a workspace adds a colored dot next to that workspace's name in the sidebar:
+
+```text
+● api · ●● · ●
+feat/auth · ↑2
+● frontend · ●
+main
+● docs
+main
+```
+
+| Dot | Meaning |
+| --- | --- |
+| 🟢 green | A process in the pane is listening on a TCP port |
+| 🟡 yellow | The pane was serving before; a command is running but no port is open yet (restarting, rebuilding) |
+| 🔴 red | The pane was serving before and is back at the shell prompt (stopped or crashed) |
+
+Each dot is one pane. Two servers running and one crashed shows as `●● · ●`.
+
+## Install
+
+```bash
+herdr plugin install mustafaergul/herdr-cowbell
+```
+
+The poller starts automatically the next time the Herdr server starts. To start it right away:
+
+```bash
+herdr plugin action invoke mustafaergul.cowbell.restart
+```
+
+### Show the dots in the sidebar (required)
+
+Herdr doesn't let plugins change the sidebar layout, so this one-time step is needed. The plugin only reports the values. Your sidebar config decides where they go and what color they are. Add this to `~/.config/herdr/config.toml`:
+
+```toml
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", "workspace",
+    { token = "$srv_up",   fg = "#a6e3a1" },
+    { token = "$srv_wait", fg = "#f9e2af" },
+    { token = "$srv_down", fg = "#f38ba8" }],
+  ["branch", "git_status"],
+]
+```
+
+Then reload:
+
+```bash
+herdr server reload-config
+```
+
+Use any `#RGB` or `#RRGGBB` color, or move the tokens to their own row. The dots appear in the expanded desktop sidebar only.
+
+## Requirements
+
+- Herdr 0.9.0 or newer
+- macOS or Linux
+- `bash`, `jq`, `lsof`, and `ps` on your `PATH`
+
+## How it works
+
+A Herdr startup hook launches a small background loop. Every few seconds the loop:
+
+1. Lists the panes with `herdr pane list`, skipping panes that run a coding agent.
+2. Gets each pane's shell pid with `herdr pane process-info`, then finds all of that shell's child processes.
+3. Checks those processes against the TCP ports in the `LISTEN` state reported by `lsof`.
+4. Writes the dot counts to each workspace with `herdr workspace report-metadata` as the tokens `srv_up`, `srv_wait`, and `srv_down`.
+
+Tokens are written with a 15 second expiry, so the dots disappear on their own if the loop stops. Only panes that have listened on a port at least once can show yellow or red, so editors, test runners, and other long-running commands don't add noise.
+
+## Configuration
+
+Set these environment variables in the environment of the Herdr server:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `COWBELL_INTERVAL` | `5` | Seconds between scans |
+| `COWBELL_TTL_MS` | `15000` | How long reported dots last without a refresh |
+
+## Troubleshooting
+
+Check that the poller is running:
+
+```bash
+pgrep -fl loop.sh
+```
+
+Inspect what the plugin reported for a workspace:
+
+```bash
+herdr workspace get <workspace_id> | jq '.result.workspace.tokens'
+```
+
+Preview one scan without writing anything:
+
+```bash
+DRY_RUN=1 ./scan.sh
+```
+
+The loop writes its output to `loop.log` in the plugin's state directory. Startup and action runs are listed by:
+
+```bash
+herdr plugin log list --plugin mustafaergul.cowbell
+```
+
+## Known limitations
+
+- Herdr puts ` · ` between adjacent sidebar tokens, so mixed statuses render as `●● · ●`.
+- Panes running a coding agent are skipped, so servers that agents start themselves aren't counted.
+- `lsof` only sees processes owned by your user. Servers running in Docker containers aren't detected.
+- A scan calls `herdr pane process-info` once per pane, so very large sessions take a couple of seconds per scan.
+
+## Uninstall
+
+```bash
+herdr plugin uninstall mustafaergul.cowbell
+```
+
+Then remove the `$srv_*` tokens from your sidebar config.
+
+## License
+
+[MIT](LICENSE)
