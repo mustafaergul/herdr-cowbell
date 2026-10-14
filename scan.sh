@@ -5,7 +5,7 @@
 #                     pane runs a process manager (overmind, foreman, ...) whose
 #                     detached servers listen from inside the pane's directory
 #   yellow $srv_wait  pane served before; a command runs but no port (restarting)
-#   red    $srv_down  pane served before; back at the shell prompt (stopped/crashed)
+#   hollow $srv_down  pane served before; back at the shell prompt (stopped/crashed)
 set -euo pipefail
 
 HERDR="${HERDR_BIN_PATH:-herdr}"
@@ -14,6 +14,8 @@ SEEN="$STATE_DIR/seen"          # pane ids that have ever listened
 TTL_MS="${COWBELL_TTL_MS:-15000}"
 DRY_RUN="${DRY_RUN:-0}"
 LAUNCHERS=" ${COWBELL_LAUNCHERS:-overmind foreman hivemind honcho} "
+DOT="${COWBELL_DOT:-●}"            # running / restarting
+DOT_DOWN="${COWBELL_DOT_DOWN:-○}"  # served before, now stopped
 mkdir -p "$STATE_DIR"; touch "$SEEN"
 
 listener_pids=$(lsof -nP -iTCP -sTCP:LISTEN -Fp 2>/dev/null | sed -n 's/^p//p' | sort -u)
@@ -82,13 +84,15 @@ while read -r ws pane shell fg tree launcher_cwd; do
 done <<< "$rows"
 printf '%s' "$new_seen" > "$SEEN"   # closed panes drop out here
 
-dots() { [ "$1" -gt 0 ] && printf '●%.0s' $(seq 1 "$1"); }
+dots() { local i out=""; for ((i = 0; i < $1; i++)); do out="$out$2"; done; printf '%s' "$out"; }
 
 for ws in $workspaces; do
   args=()
   for kind in up wait down; do
     n=$(printf '%s' "$report" | grep -c "^$ws $kind$" || true)
-    if [ "$n" -gt 0 ]; then args+=(--token "srv_$kind=$(dots "$n")"); else args+=(--clear-token "srv_$kind"); fi
+    if [ "$n" -eq 0 ]; then args+=(--clear-token "srv_$kind"); continue; fi
+    if [ "$kind" = down ]; then sym=$DOT_DOWN; else sym=$DOT; fi
+    args+=(--token "srv_$kind=$(dots "$n" "$sym")")
   done
   if [ "$DRY_RUN" = 1 ]; then echo "$ws ${args[*]}"; continue; fi
   "$HERDR" workspace report-metadata "$ws" --source cowbell --ttl-ms "$TTL_MS" "${args[@]}" >/dev/null

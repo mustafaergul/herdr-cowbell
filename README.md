@@ -7,11 +7,11 @@ A herder knows where the herd is by its cowbells. Cowbell does the same for the 
 Each server running in a workspace adds a colored dot next to that workspace's name in the sidebar:
 
 ```text
-● api · ●● · ●
+● api · ●● · ○
 feat/auth · ↑2
 ● frontend · ●
 main
-● docs
+● docs · ○
 main
 ```
 
@@ -19,9 +19,9 @@ main
 | --- | --- |
 | 🟢 green | A process in the pane is listening on a TCP port, including servers started through overmind or foreman |
 | 🟡 yellow | The pane was serving before; a command is still running but nothing is listening (restarting, rebuilding, or all overmind processes stopped) |
-| 🔴 red | The pane was serving before and is back at the shell prompt (stopped or crashed) |
+| ○ hollow | A server ran in this pane before and it's back at the shell prompt (stopped or crashed). Stays until the pane is closed, so you can see where your servers live. |
 
-Each dot is one pane. Two servers running and one crashed shows as `●● · ●`.
+Each dot is one pane. Two servers running and one stopped shows as `●● · ○`.
 
 ## Install
 
@@ -80,7 +80,7 @@ A Herdr startup hook launches a small background loop. Every few seconds the loo
 4. For panes running a process manager, matches the remaining listeners by working directory.
 5. Writes the dot counts to each workspace with `herdr workspace report-metadata` as the tokens `srv_up`, `srv_wait`, and `srv_down`.
 
-Tokens are written with a 15 second expiry, so the dots disappear on their own if the loop stops. Only panes that have listened on a port at least once can show yellow or red, so editors, test runners, and other long-running commands don't add noise.
+Tokens are written with a 15 second expiry, so the dots disappear on their own if the loop stops. Only panes that have listened on a port at least once can show a yellow dot or a hollow circle, so editors, test runners, and other long-running commands don't add noise.
 
 ## Configuration
 
@@ -90,6 +90,8 @@ Set these environment variables in the environment of the Herdr server:
 | --- | --- | --- |
 | `COWBELL_INTERVAL` | `5` | Seconds between scans |
 | `COWBELL_TTL_MS` | `15000` | How long reported dots last without a refresh |
+| `COWBELL_DOT` | `●` | Symbol for running and restarting servers |
+| `COWBELL_DOT_DOWN` | `○` | Symbol for panes whose server has stopped |
 | `COWBELL_LAUNCHERS` | `overmind foreman hivemind honcho` | Space-separated process names treated as process managers |
 
 ## Troubleshooting
@@ -120,7 +122,8 @@ herdr plugin log list --plugin mustafaergul.cowbell
 
 ## Known limitations
 
-- Herdr puts ` · ` between adjacent sidebar tokens, so mixed statuses render as `●● · ●`.
+- Herdr puts ` · ` between adjacent sidebar tokens, so mixed statuses render as `●● · ○`.
+- Cowbell remembers server panes by pane id. Live handoffs keep that memory, but a full Herdr restart can renumber panes, so hollow circles start over after one.
 - Panes running a coding agent are skipped, so servers that agents start themselves aren't counted.
 - `lsof` only sees processes owned by your user. Servers running in Docker containers aren't detected, including Docker services inside a Procfile.
 - puma-dev in app mode (symlinks in `~/.puma-dev` pointing at app folders) isn't detected, because puma-dev starts those apps on demand with no pane to attach them to.
