@@ -23,6 +23,16 @@ main
 
 Each dot is one pane. Two servers running and one stopped shows as `●● · ○`.
 
+The same dots are appended to the name of the tab that holds each server pane, so you can also spot them in the tab bar:
+
+```text
+ agent   teamtailor ●   importer ●○
+```
+
+Each server pane also gets its own dot at the end of its label, shown on the pane border (`server ●`). A pane with no label gets just the dot, and its label is cleared again when the server goes away. Herdr only draws borders for split panes, unless `ui.pane_borders = "always"` is set.
+
+Herdr can't color tab names or pane labels, so there running and restarting servers both show as `●`, and stopped ones as `○`. Set `COWBELL_TABS=0` or `COWBELL_PANES=0` to leave tab names or pane labels alone.
+
 ## Install
 
 ```bash
@@ -79,6 +89,7 @@ A Herdr startup hook launches a small background loop. Every few seconds the loo
 3. Checks those processes against the TCP ports in the `LISTEN` state reported by `lsof`.
 4. For panes running a process manager, matches the remaining listeners by working directory.
 5. Writes the dot counts to each workspace with `herdr workspace report-metadata` as the tokens `srv_up`, `srv_wait`, and `srv_down`.
+6. Renames each tab and pane with `herdr tab rename` and `herdr pane rename` so its name ends in its dots, and strips them again when its servers go away.
 
 Tokens are written with a 15 second expiry, so the dots disappear on their own if the loop stops. Only panes that have listened on a port at least once can show a yellow dot or a hollow circle, so editors, test runners, and other long-running commands don't add noise.
 
@@ -92,6 +103,8 @@ Set these environment variables in the environment of the Herdr server:
 | `COWBELL_TTL_MS` | `15000` | How long reported dots last without a refresh |
 | `COWBELL_DOT` | `●` | Symbol for running and restarting servers |
 | `COWBELL_DOT_DOWN` | `○` | Symbol for panes whose server has stopped |
+| `COWBELL_TABS` | `1` | Set to `0` to stop appending dots to tab names |
+| `COWBELL_PANES` | `1` | Set to `0` to stop appending dots to pane labels |
 | `COWBELL_LAUNCHERS` | `overmind foreman hivemind honcho` | Space-separated process names treated as process managers |
 
 ## Troubleshooting
@@ -123,6 +136,7 @@ herdr plugin log list --plugin mustafaergul.cowbell
 ## Known limitations
 
 - Herdr puts ` · ` between adjacent sidebar tokens, so mixed statuses render as `●● · ○`.
+- Herdr has no plugin tokens for the tab bar or pane borders, so those dots are part of the tab name or pane label. If the poller stops, they stay until you rename the tab or pane. A tab with an automatic name (`1`, `2`, ...) may keep that number as a fixed name once Cowbell has renamed it.
 - Cowbell remembers server panes by pane id. Live handoffs keep that memory, but a full Herdr restart can renumber panes, so hollow circles start over after one.
 - Panes running a coding agent are skipped, so servers that agents start themselves aren't counted.
 - `lsof` only sees processes owned by your user. Servers running in Docker containers aren't detected, including Docker services inside a Procfile.
@@ -137,7 +151,7 @@ herdr plugin log list --plugin mustafaergul.cowbell
 herdr plugin uninstall mustafaergul.cowbell
 ```
 
-Then remove the `$srv_*` tokens from your sidebar config.
+Then remove the `$srv_*` tokens from your sidebar config, and rename any tabs or panes that still end in dots.
 
 ## License
 
